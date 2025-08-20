@@ -1,44 +1,18 @@
 <?php
-function createPesapalOrder($token, $orderData) {
-    $url = 'https://pay.pesapal.com/v3/api/Transactions/SubmitOrderRequest';
-    $headers = [
-        'Authorization: Bearer ' . $token,
-        'Content-Type: application/json',
-        'Accept: application/json'
-    ];
 
-    $body = json_encode($orderData);
+declare(strict_types=1);
 
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_POSTFIELDS => $body
-    ]);
+// ✅ Basic Appwrite Function sanity check
+header('Content-Type: application/json');
 
-    $response = curl_exec($ch);
-    curl_close($ch);
-
-    return json_decode($response, true);
-}
-
-// Example usage
-$token = $_ENV['PESAPAL_TOKEN']; // Or call getPesapalToken()
-$order = [
-    'id' => uniqid(),
-    'currency' => 'KES',
-    'amount' => 1000,
-    'description' => 'Student Premium Plan',
-    'callback_url' => 'https://yourdomain.com/ipn',
-    'notification_id' => $_ENV['PESAPAL_NOTIFICATION_ID'],
-    'billing_address' => [
-        'email_address' => 'student@example.com',
-        'phone_number' => '0712345678',
-        'first_name' => 'Ian',
-        'last_name' => 'Mwangi'
-    ]
+$response = [
+    'status' => 'success',
+    'message' => 'Function deployed via GitHub is working 🎉',
+    'timestamp' => date('Y-m-d H:i:s'),
+    'method' => $_SERVER['REQUEST_METHOD'],
+    'query' => $_GET,
+    'input' => json_decode(file_get_contents('php://input'), true),
 ];
 
-$response = createPesapalOrder($token, $order);
+// 🔥 Output JSON response
 echo json_encode($response);
