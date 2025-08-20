@@ -1,41 +1,61 @@
 <?php
+if (!defined('APP_ENVIROMENT')) {
+    define('APP_ENVIROMENT', 'live'); // sandbox or live
+}
 
-require_once(__DIR__ . '/../vendor/autoload.php');
+function getAccessToken() {
+    if(APP_ENVIROMENT == 'sandbox'){
+        $apiUrl = "https://cybqa.pesapal.com/pesapalv3/api/Auth/RequestToken"; // Sandbox URL
+        $consumerKey = "qkio1BGGYAXTu2JOfm7XSXNruoZsrqEW";
+        $consumerSecret = "osGQ364R49cXKeOYSpaOnT++rHs=";
+    }elseif(APP_ENVIROMENT == 'live'){
+        $apiUrl = "https://pay.pesapal.com/v3/api/Auth/RequestToken"; // Live URL
+        $consumerKey = "Xoo2yQc5VCg++LH5uOhlvrvmv4CsfYs1";
+        $consumerSecret = "puDJIjs7Uo1BZQ3o6gGuHNmhRUk=";
+    }else{
+        throw new Exception("Invalid APP_ENVIROMENT");
+    }
 
-use Appwrite\Client;
-use Appwrite\Services\Users;
+    $headers = [
+        "Accept: application/json",
+        "Content-Type: application/json"
+    ];
+    $data = [
+        "consumer_key" => $consumerKey,
+        "consumer_secret" => $consumerSecret
+    ];
 
-// This Appwrite function will be executed every time your function is triggered
-return function ($context) {
-    // You can use the Appwrite SDK to interact with other services
-    // For this example, we're using the Users service
-    $client = new Client();
-    $client
-        ->setEndpoint(getenv('APPWRITE_FUNCTION_API_ENDPOINT'))
-        ->setProject(getenv('APPWRITE_FUNCTION_PROJECT_ID'))
-        ->setKey($context->req->headers['x-appwrite-key']);
-    $users = new Users($client);
+    $ch = curl_init($apiUrl);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
 
+    if ($httpCode !== 200) {
+        throw new Exception("Failed to get access token. HTTP Code: " . $httpCode);
+    }
+
+    $data = json_decode($response);
+    if (!$data || !isset($data->token)) {
+        throw new Exception("Invalid response from Pesapal: " . $response);
+    }
+
+    return $data->token;
+}
+
+// Only return JSON response if this file is called directly
+if (basename(__FILE__) == basename($_SERVER['PHP_SELF'])) {
     try {
-        $response = $users->list();
-        // Log messages and errors to the Appwrite Console
-        // These logs won't be seen by your end users
-        $context->log('Total users: ' . $response['total']);
-    } catch(Throwable $error) {
-        $context->error('Could not list users: ' . $error->getMessage());
+        $token = getAccessToken();
+        header('Content-Type: application/json');
+        echo json_encode(['token' => $token]);
+    } catch (Exception $e) {
+        header('Content-Type: application/json');
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
     }
+} 
 
-    // The req object contains the request data
-    if ($context->req->path === '/ping') {
-        // Use res object to respond with text(), json(), or binary()
-        // Don't forget to return a response!
-        return $context->res->text('Pong');
-    }
-
-    return $context->res->json([
-        'motto' => 'Build like a team of hundreds_',
-        'learn' => 'https://appwrite.io/docs',
-        'connect' => 'https://appwrite.io/discord',
-        'getInspired' => 'https://builtwith.appwrite.io',
-    ]);
-};
