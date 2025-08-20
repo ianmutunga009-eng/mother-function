@@ -1,34 +1,50 @@
-<?php
+require_once 'src/Pesapal/Token.php';
+require_once 'src/Pesapal/Order.php';
+require_once 'src/Pesapal/IPNHandler.php';
 
-require_once(__DIR__ . '/../vendor/autoload.php');
+use Pesapal\Token;
+use Pesapal\Order;
+use Pesapal\IPNHandler;
 
-use Appwrite\Client;
-use Appwrite\Services\Users;
-
-return function ($context) {
-    $client = new Client();
-    $client
-        ->setEndpoint(getenv('APPWRITE_FUNCTION_API_ENDPOINT'))
-        ->setProject(getenv('APPWRITE_FUNCTION_PROJECT_ID'))
-        ->setKey($context->req->headers['x-appwrite-key']);
-
-    $users = new Users($client);
-
-    try {
-        $response = $users->list();
-        $context->log('Total users: ' . $response['total']);
-
-        return $context->res->json([
-            'status' => 'success',
-            'totalUsers' => $response['total'],
-            'users' => $response['users']
-        ]);
-    } catch (Throwable $error) {
-        $context->error('Could not list users: ' . $error->getMessage());
-
-        return $context->res->json([
-            'status' => 'error',
-            'message' => $error->getMessage()
-        ]);
+return function($context) {
+    // Get request method and path
+    $method = $context->req->method;
+    $path = $context->req->path ?? '/';
+    
+    // Route the request
+    switch ($path) {
+        case '/ping':
+            return $context->res->json(['status' => 'alive', 'timestamp' => time()]);
+            
+        case '/create-order':
+            if ($method !== 'POST') {
+                return $context->res->json(['error' => 'Method not allowed'], 405);
+            }
+            
+            try {
+                $orderHandler = new Order($context);
+                $result = $orderHandler->createOrder($context->req->body);
+                return $context->res->json($result);
+            } catch (Exception $e) {
+                $context->error('Order creation failed: ' . $e->getMessage());
+                return $context->res->json(['error' => 'Order creation failed'], 500);
+            }
+            
+        case '/ipn':
+            if ($method !== 'POST') {
+                return $context->res->json(['error' => 'Method not allowed'], 405);
+            }
+            
+            try {
+                $ipnHandler = new IPNHandler($context);
+                $result = $ipnHandler->processIPN($context->req->body);
+                return $context->res->json($result);
+            } catch (Exception $e) {
+                $context->error('IPN processing failed: ' . $e->getMessage());
+                return $context->res->json(['error' => 'IPN processing failed'], 500);
+            }
+            
+        default:
+            return $context->res->json(['error' => 'Route not found'], 404);
     }
 };
